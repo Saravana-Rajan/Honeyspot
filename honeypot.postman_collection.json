@@ -1,0 +1,95 @@
+{
+  "info": {
+    "_postman_id": "a4c94f24-0000-0000-0000-honeypot-techjays",
+    "name": "Agentic Honeypot API - Techjays",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for testing the Agentic Honeypot FastAPI service."
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Honeypot - First Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"demo-session-001\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Your bank account will be blocked today. Verify immediately.\",\n    \"timestamp\": \"2026-01-21T10:15:30Z\"\n  },\n  \"conversationHistory\": [],\n  \"metadata\": {\n    \"channel\": \"SMS\",\n    \"language\": \"English\",\n    \"locale\": \"IN\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/honeypot",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "honeypot"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Honeypot - Follow-Up Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"demo-session-001\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Share your UPI ID to avoid account suspension.\",\n    \"timestamp\": \"2026-01-21T10:17:10Z\"\n  },\n  \"conversationHistory\": [\n    {\n      \"sender\": \"scammer\",\n      \"text\": \"Your bank account will be blocked today. Verify immediately.\",\n      \"timestamp\": \"2026-01-21T10:15:30Z\"\n    },\n    {\n      \"sender\": \"user\",\n      \"text\": \"Why will my account be blocked?\",\n      \"timestamp\": \"2026-01-21T10:16:10Z\"\n    }\n  ],\n  \"metadata\": {\n    \"channel\": \"SMS\",\n    \"language\": \"English\",\n    \"locale\": \"IN\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/honeypot",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "honeypot"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "apiKey",
+      "value": "YOUR_HONEYPOT_API_KEY"
+    }
+  ]
+}
+
