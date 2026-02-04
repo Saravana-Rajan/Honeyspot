@@ -27,6 +27,20 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def log_incoming_requests(request: Request, call_next):
+    """Log every request before any parsing - helps debug GUVI tester vs Postman."""
+    if request.url.path == "/honeypot":
+        has_key = "x-api-key" in request.headers
+        ct = request.headers.get("content-type", "")
+        logger.info("Incoming /honeypot | method=%s | content_type=%s | has_x_api_key=%s",
+                    request.method, ct, has_key)
+    response = await call_next(request)
+    if request.url.path == "/honeypot" and hasattr(response, "status_code"):
+        logger.info("Response status=%d for /honeypot", response.status_code)
+    return response
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.warning("Validation failed: %s", exc.errors())

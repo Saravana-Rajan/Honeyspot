@@ -1,19 +1,19 @@
 from datetime import datetime, timezone
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-def _parse_timestamp(v: Union[int, str, datetime]) -> datetime:
-    """Accept epoch ms (int), ISO string, or datetime. GUVI sends epoch ms."""
+def _parse_timestamp(v: object) -> datetime:
+    """Accept epoch ms (int/float), ISO string, or datetime. GUVI sends epoch ms."""
     if isinstance(v, datetime):
         return v
-    if isinstance(v, int):
-        return datetime.fromtimestamp(v / 1000.0, tz=timezone.utc)
+    if isinstance(v, (int, float)):
+        return datetime.fromtimestamp(float(v) / 1000.0, tz=timezone.utc)
     if isinstance(v, str):
         s = v.replace("Z", "+00:00") if v.endswith("Z") else v
         return datetime.fromisoformat(s)
-    raise ValueError(f"Invalid timestamp: {v}")
+    raise ValueError(f"Invalid timestamp: {type(v)}")
 
 
 class Message(BaseModel):
@@ -24,7 +24,14 @@ class Message(BaseModel):
     @field_validator("timestamp", mode="before")
     @classmethod
     def parse_timestamp(cls, v: object) -> datetime:
-        return _parse_timestamp(v)  # type: ignore
+        return _parse_timestamp(v)
+
+    @field_validator("sender", mode="before")
+    @classmethod
+    def normalize_sender(cls, v: object) -> str:
+        if isinstance(v, str):
+            return v.lower().strip()
+        return v  # type: ignore
 
 
 class Metadata(BaseModel):
@@ -34,9 +41,11 @@ class Metadata(BaseModel):
 
 
 class HoneypotRequest(BaseModel):
-    sessionId: str
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    sessionId: str = Field(alias="session_id")
     message: Message
-    conversationHistory: List[Message] = []
+    conversationHistory: List[Message] = Field(default_factory=list, alias="conversation_history")
     metadata: Optional[Metadata] = None
 
 
