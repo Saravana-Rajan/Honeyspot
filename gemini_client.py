@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import List
@@ -18,6 +19,8 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
+_model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+
 
 _SYSTEM_PROMPT = """
 You are an AI agent operating a scam honeypot for banks and payment platforms.
@@ -32,6 +35,13 @@ CRITICAL:
 - Never admit that you are detecting a scam.
 - Never provide real personal data; you may fabricate plausible but clearly fake details if needed to keep engagement.
 - Respond in the language and style of the conversation if obvious.
+
+IMPORTANT - FALSE POSITIVE AVOIDANCE:
+- Set scamDetected=false for legitimate, everyday conversations even if they mention money, banks, OTPs, or UPI.
+- Recognize normal contexts: family members asking for money ("Mom send Rs 500 for lunch"), friends splitting bills, genuine delivery/OTP mentions, insurance premium reminders, salary notifications, IFSC code sharing, bank branch inquiries, job interview discussions, and casual conversations.
+- Only flag scamDetected=true when there is clear MALICIOUS INTENT: urgency pressure tactics, threats of account blocking, requests for sensitive credentials (OTP/PIN/CVV/password), suspicious links with fake domains, impersonation of officials, too-good-to-be-true offers, or demands to transfer money to unknown accounts.
+- The key distinction is INTENT: a mother asking her child to send money via UPI is NOT a scam. A stranger pretending to be a bank officer demanding OTP IS a scam.
+- When the sender is "user" (the potential victim), their messages are almost never scams - they are the person being protected.
 
 You MUST respond in strict JSON with the following schema:
 {
@@ -66,33 +76,16 @@ def build_conversation_text(request: HoneypotRequest) -> str:
     return "\n".join(lines)
 
 
-def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
-    conversation_text = build_conversation_text(request)
-    logger.info("Calling Gemini | sessionId=%s | model=%s", request.sessionId, GEMINI_MODEL_NAME)
-
-    start = time.perf_counter()
-    model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-    response = model.generate_content(
-        [
-            _SYSTEM_PROMPT.strip(),
-            "\n---\n",
-            "CONVERSATION:\n",
-            conversation_text,
-        ],
-        generation_config={"response_mime_type": "application/json"},
-    )
-
-    raw_text = response.text
+def _parse_gemini_json(raw_text: str) -> GeminiAnalysisResult:
+    """Parse Gemini's JSON response into a validated result."""
     try:
-        import json
-
         data = json.loads(raw_text)
     except Exception as exc:
         raise RuntimeError(f"Gemini returned non-JSON output: {exc}") from exc
 
     try:
         intelligence = ExtractedIntelligence(**data.get("intelligence", {}))
-        result = GeminiAnalysisResult(
+        return GeminiAnalysisResult(
             scamDetected=bool(data.get("scamDetected", False)),
             agentReply=str(data.get("agentReply", "")),
             agentNotes=str(data.get("agentNotes", "")),
@@ -103,6 +96,23 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
         logger.error("Gemini output validation failed: %s", exc)
         raise RuntimeError(f"Gemini output failed validation: {exc}") from exc
 
+
+def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
+    conversation_text = build_conversation_text(request)
+    logger.info("Calling Gemini | sessionId=%s | model=%s", request.sessionId, GEMINI_MODEL_NAME)
+
+    start = time.perf_counter()
+    response = _model.generate_content(
+        [
+            _SYSTEM_PROMPT.strip(),
+            "\n---\n",
+            "CONVERSATION:\n",
+            conversation_text,
+        ],
+        generation_config={"response_mime_type": "application/json"},
+    )
+
+    result = _parse_gemini_json(response.text)
     elapsed_ms = (time.perf_counter() - start) * 1000
     logger.info("Gemini done | sessionId=%s | scamDetected=%s | elapsed_ms=%.0f",
                 request.sessionId, result.scamDetected, elapsed_ms)
