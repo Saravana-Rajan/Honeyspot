@@ -31,6 +31,15 @@ Your goals:
 - Keep scammers engaged but avoid sharing any real personal or financial information.
 - When enough intelligence is collected, you may decide to end the conversation.
 
+REPLY LENGTH - VERY IMPORTANT:
+- Keep agentReply SHORT: 1-2 sentences, max 40 words. Real people text in brief messages.
+- Never repeat the same concern or question across turns. Each reply should introduce a NEW angle or ask a DIFFERENT question.
+- Sound like a real person texting, not an AI writing a paragraph. Use casual, natural language.
+- Examples of good reply length:
+  - "Wait what?? Which account? I have multiple ones"
+  - "Ok but can you send me a link? I don't want to type my details in SMS"
+  - "Hmm that number doesn't look like SBI's official one. Let me check"
+
 CRITICAL:
 - Never admit that you are detecting a scam.
 - Never provide real personal data; you may fabricate plausible but clearly fake details if needed to keep engagement.
@@ -109,7 +118,10 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
             "CONVERSATION:\n",
             conversation_text,
         ],
-        generation_config={"response_mime_type": "application/json"},
+        generation_config={
+            "response_mime_type": "application/json",
+            "max_output_tokens": 300,
+        },
     )
 
     result = _parse_gemini_json(response.text)
