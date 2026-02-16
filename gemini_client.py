@@ -139,8 +139,8 @@ def _parse_gemini_json(raw_text: str) -> GeminiAnalysisResult:
         raise RuntimeError(f"Gemini output failed validation: {exc}") from exc
 
 
-_GEMINI_MAX_ATTEMPTS = 2
-_GEMINI_RETRY_DELAY = 1.0
+_GEMINI_MAX_ATTEMPTS = 4
+_GEMINI_RETRY_DELAYS = [1.0, 2.0, 4.0]  # exponential backoff
 
 
 def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
@@ -159,7 +159,7 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
                     conversation_text,
                 ],
                 generation_config={"response_mime_type": "application/json"},
-                request_options={"timeout": 45},
+                request_options={"timeout": 60},
             )
             result = _parse_gemini_json(response.text)
             elapsed_ms = (time.perf_counter() - start) * 1000
@@ -171,7 +171,8 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
             logger.warning("Gemini attempt %d failed | sessionId=%s | error=%s",
                            attempt, request.sessionId, exc)
             if attempt < _GEMINI_MAX_ATTEMPTS:
-                time.sleep(_GEMINI_RETRY_DELAY)
+                delay = _GEMINI_RETRY_DELAYS[min(attempt - 1, len(_GEMINI_RETRY_DELAYS) - 1)]
+                time.sleep(delay)
 
     raise last_exc
 
