@@ -2,6 +2,12 @@
 
 An AI-powered honeypot system that detects scams, engages fraudsters as a believable human victim, and extracts actionable intelligence (bank accounts, UPI IDs, phone numbers, phishing links, email addresses) across SMS, WhatsApp, Email, and Chat channels. Supports 10+ Indian languages.
 
+Built for the GUVI Hackathon, designed to deploy on Google Cloud Run.
+
+## How It Works
+
+Honeyspot receives conversation messages via a REST API and uses Google Gemini to analyze the conversation in real time. The AI agent plays the role of a cautious human victim — keeping scammers engaged while never revealing real information. When enough intelligence has been gathered and a scam is confirmed, Honeyspot triggers a callback to report the extracted data.
+
 ## Tech Stack
 
 | Component | Technology |
@@ -52,11 +58,11 @@ cp .env.example .env
 
 Edit `.env` and fill in your keys:
 
-```dotenv
-GEMINI_API_KEY=your-gemini-api-key-here      # Required - from Google AI Studio
-HONEYPOT_API_KEY=your-api-key-here           # Required - any secret string for auth
-GEMINI_MODEL_NAME=gemini-2.5-flash           # Optional - defaults to gemini-2.5-flash
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HONEYPOT_API_KEY` | API key for authenticating requests | _(required)_ |
+| `GEMINI_API_KEY` | Google Gemini API key | _(required)_ |
+| `GEMINI_MODEL_NAME` | Gemini model to use | `gemini-2.5-flash` |
 
 ### 5. Start the server
 
@@ -276,7 +282,9 @@ Honeyspot/
 ├── config.py               # Environment configuration
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile              # Cloud Run container
+├── .dockerignore           # Files excluded from Docker build
 ├── .env.example            # Environment variable template
+├── honeypot.postman_collection.json  # Postman collection for API testing
 └── tests/
     ├── run_all.py           # Test runner (all categories)
     ├── helpers.py           # Shared test utilities
@@ -292,4 +300,4 @@ Honeyspot/
 
 ## License
 
-MIT
+This project is part of the GUVI Hackathon.
