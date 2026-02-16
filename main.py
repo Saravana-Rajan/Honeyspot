@@ -13,11 +13,26 @@ from config import API_KEY_HEADER_NAME, EXPECTED_API_KEY
 from gemini_client import analyze_with_gemini
 from schemas import EngagementMetrics, HoneypotRequest, HoneypotResponse
 
+LOG_DIR = "log"
+LOG_FILE = f"{LOG_DIR}/error.log"
+import os
+os.makedirs(LOG_DIR, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+
+# File handler for errors - enables automated monitoring
+_file_handler = logging.FileHandler(LOG_FILE)
+_file_handler.setLevel(logging.WARNING)
+_file_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+))
+logging.getLogger().addHandler(_file_handler)
+
 logger = logging.getLogger("honeypot")
 
 
@@ -141,6 +156,7 @@ async def honeypot_endpoint(
                 request=payload,
                 scam_detected=analysis.scamDetected,
                 total_messages_exchanged=metrics.totalMessagesExchanged,
+                engagement_duration_seconds=metrics.engagementDurationSeconds,
                 intelligence=analysis.intelligence,
                 agent_notes=analysis.agentNotes,
             )
