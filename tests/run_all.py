@@ -125,6 +125,15 @@ def main() -> int:
     all_results.extend(r)
     all_failures.extend(f)
 
+    # ── Module 9: Edge Cases (Language Match, Injection, Role Reversal) ─
+    print("\n\033[93m>>> Running: test_edge_cases\033[0m")
+    clear_results()
+    from tests import test_edge_cases
+    test_edge_cases.run()
+    r, f = _collect_and_reset()
+    all_results.extend(r)
+    all_failures.extend(f)
+
     # ── Grand Summary ────────────────────────────────────────────────────
     elapsed = round((time.perf_counter() - suite_start) * 1000)
     failed = print_summary(
