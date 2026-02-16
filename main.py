@@ -10,8 +10,8 @@ from fastapi.responses import ORJSONResponse
 
 from callback_client import send_final_result_callback
 from config import API_KEY_HEADER_NAME, EXPECTED_API_KEY
-from gemini_client import analyze_with_gemini, regex_extract_intelligence
-from schemas import EngagementMetrics, GeminiAnalysisResult, HoneypotRequest, HoneypotResponse
+from gemini_client import analyze_with_gemini
+from schemas import EngagementMetrics, ExtractedIntelligence, GeminiAnalysisResult, HoneypotRequest, HoneypotResponse
 
 LOG_DIR = "log"
 LOG_FILE = f"{LOG_DIR}/error.log"
@@ -127,15 +127,13 @@ async def honeypot_endpoint(
         analysis = await asyncio.to_thread(analyze_with_gemini, payload)
     except Exception as exc:
         # NEVER return 500 — the evaluator requires HTTP 200 on every turn.
-        # Fall back to regex-only intelligence extraction with a safe reply.
         logger.exception("Gemini error (using fallback): %s", exc)
-        fallback_intel = regex_extract_intelligence(payload)
         analysis = GeminiAnalysisResult(
             scamDetected=True,
             agentReply="Hmm let me think about that. Can you tell me more?",
-            agentNotes=f"Gemini unavailable, regex fallback used: {exc}",
-            intelligence=fallback_intel,
-            shouldTriggerCallback=True,
+            agentNotes=f"Gemini unavailable: {exc}",
+            intelligence=ExtractedIntelligence(),
+            shouldTriggerCallback=False,
         )
 
     metrics = compute_engagement_metrics(payload)
