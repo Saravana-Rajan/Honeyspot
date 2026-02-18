@@ -50,8 +50,8 @@ class HoneypotRequest(BaseModel):
 
 
 class EngagementMetrics(BaseModel):
-    engagementDurationSeconds: int
-    totalMessagesExchanged: int
+    engagementDurationSeconds: int = 0
+    totalMessagesExchanged: int = 0
 
 
 class ExtractedIntelligence(BaseModel):
@@ -64,13 +64,16 @@ class ExtractedIntelligence(BaseModel):
 
 
 class HoneypotResponse(BaseModel):
+    # Per-turn fields (platform reads 'reply' for conversation continuation)
     status: Literal["success", "error"]
     reply: str
+    # Scoring fields (included so the platform can score from the response too)
+    sessionId: str = ""
     scamDetected: bool = False
-    extractedIntelligence: Optional[ExtractedIntelligence] = None
-    agentNotes: Optional[str] = None
-    engagementMetrics: Optional["EngagementMetrics"] = None
-   
+    totalMessagesExchanged: int = 0
+    extractedIntelligence: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
+    engagementMetrics: EngagementMetrics = Field(default_factory=EngagementMetrics)
+    agentNotes: str = ""
 
 
 class GeminiAnalysisResult(BaseModel):
@@ -79,4 +82,3 @@ class GeminiAnalysisResult(BaseModel):
     agentNotes: str
     intelligence: ExtractedIntelligence
     shouldTriggerCallback: bool = False
-

@@ -139,9 +139,8 @@ def _parse_gemini_json(raw_text: str) -> GeminiAnalysisResult:
         raise RuntimeError(f"Gemini output failed validation: {exc}") from exc
 
 
-_GEMINI_MAX_ATTEMPTS = 2
-_GEMINI_RETRY_DELAYS = [1.0]  # single retry with 1s delay
-_GEMINI_TIMEOUT = 20  # seconds — must stay well under evaluator's 30s limit
+_GEMINI_MAX_ATTEMPTS = 1          # No time for retries inside 30-second window
+_GEMINI_RETRY_DELAY = 0.5
 
 
 def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
@@ -159,8 +158,12 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
                     "CONVERSATION:\n",
                     conversation_text,
                 ],
-                generation_config={"response_mime_type": "application/json"},
-                request_options={"timeout": _GEMINI_TIMEOUT},
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "temperature": 0,
+                    "max_output_tokens": 800,
+                },
+                request_options={"timeout": 22},
             )
             result = _parse_gemini_json(response.text)
             elapsed_ms = (time.perf_counter() - start) * 1000
@@ -172,17 +175,6 @@ def analyze_with_gemini(request: HoneypotRequest) -> GeminiAnalysisResult:
             logger.warning("Gemini attempt %d failed | sessionId=%s | error=%s",
                            attempt, request.sessionId, exc)
             if attempt < _GEMINI_MAX_ATTEMPTS:
-                delay = _GEMINI_RETRY_DELAYS[min(attempt - 1, len(_GEMINI_RETRY_DELAYS) - 1)]
-                time.sleep(delay)
+                time.sleep(_GEMINI_RETRY_DELAY)
 
-    # All Gemini attempts failed — return a safe fallback
-    logger.warning("All Gemini attempts failed | sessionId=%s | error=%s",
-                   request.sessionId, last_exc)
-    return GeminiAnalysisResult(
-        scamDetected=True,  # conservative: assume scam if Gemini can't respond
-        agentReply="Sorry, I was busy. Can you repeat that?",
-        agentNotes=f"Gemini failed after {_GEMINI_MAX_ATTEMPTS} attempts: {last_exc}",
-        intelligence=ExtractedIntelligence(),
-        shouldTriggerCallback=False,
-    )
-
+    raise last_exc
