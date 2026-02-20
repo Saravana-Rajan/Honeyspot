@@ -17,7 +17,9 @@ def _parse_timestamp(v: object) -> datetime:
 
 
 class Message(BaseModel):
-    sender: Literal["scammer", "user"]
+    model_config = ConfigDict(extra="ignore")
+
+    sender: str
     text: str
     timestamp: datetime
 
@@ -31,10 +33,12 @@ class Message(BaseModel):
     def normalize_sender(cls, v: object) -> str:
         if isinstance(v, str):
             return v.lower().strip()
-        return v  # type: ignore
+        return str(v)
 
 
 class Metadata(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     channel: Optional[str] = None
     language: Optional[str] = None
     locale: Optional[str] = None
@@ -60,6 +64,9 @@ class ExtractedIntelligence(BaseModel):
     phishingLinks: List[str] = []
     phoneNumbers: List[str] = []
     emailAddresses: List[str] = []
+    caseIds: List[str] = []
+    policyNumbers: List[str] = []
+    orderNumbers: List[str] = []
     suspiciousKeywords: List[str] = []
 
 
@@ -70,7 +77,10 @@ class HoneypotResponse(BaseModel):
     # Scoring fields (included so the platform can score from the response too)
     sessionId: str = ""
     scamDetected: bool = False
+    scamType: str = ""
+    confidenceLevel: float = 0.0
     totalMessagesExchanged: int = 0
+    engagementDurationSeconds: int = 0
     extractedIntelligence: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
     engagementMetrics: EngagementMetrics = Field(default_factory=EngagementMetrics)
     agentNotes: str = ""
@@ -78,6 +88,8 @@ class HoneypotResponse(BaseModel):
 
 class GeminiAnalysisResult(BaseModel):
     scamDetected: bool
+    scamType: str = ""
+    confidenceLevel: float = 0.85
     agentReply: str
     agentNotes: str
     intelligence: ExtractedIntelligence

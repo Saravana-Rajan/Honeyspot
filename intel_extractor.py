@@ -45,6 +45,42 @@ _URL_PATTERN = re.compile(
 # ---------------------------------------------------------------------------
 _AT_PATTERN = re.compile(r'[\w.\-+]+@[\w.\-]+')
 
+# ---------------------------------------------------------------------------
+# Case / Reference IDs  (CASE-12345, REF-789, FIR/2025/001, etc.)
+# ---------------------------------------------------------------------------
+_CASE_ID_PATTERNS = [
+    # Standard: CASE-12345, REF-789, FIR/2025/001 (digit right after prefix)
+    re.compile(r'\b(?:CASE|REF|REFERENCE|COMPLAINT|FIR|TICKET|CR|SR|INC)[-/#\s]?\d[\w\-/]{2,20}\b', re.IGNORECASE),
+    # With text: REF-LUCKY-2025-001, FIR-2025-GOV-456 (word then digit somewhere)
+    re.compile(r'\b(?:CASE|REF|REFERENCE|COMPLAINT|FIR|TICKET|CR|SR|INC)[-/#](?=[\w\-/]*\d)[\w\-/]{3,30}\b', re.IGNORECASE),
+    # Lowercase with colon: case: #12345
+    re.compile(r'\b(?:case|ref|reference|complaint|fir|ticket)[\s:]*#?\s*\d[\w\-/]{2,20}\b', re.IGNORECASE),
+]
+
+# ---------------------------------------------------------------------------
+# Policy Numbers  (POL-12345, LIC-789, POLICY-ABC123, etc.)
+# ---------------------------------------------------------------------------
+_POLICY_PATTERNS = [
+    # Standard: POL-12345, LIC-789 (digit right after prefix)
+    re.compile(r'\b(?:POL|POLICY|INS|LIC|INSURANCE)[-/#\s]?\d[\w\-]{2,20}\b', re.IGNORECASE),
+    # With text: POLICY-ABC-123 (word then digit somewhere)
+    re.compile(r'\b(?:POL|POLICY|INS|LIC|INSURANCE)[-/#](?=[\w\-]*\d)[\w\-]{3,30}\b', re.IGNORECASE),
+    # Lowercase with colon: policy: #12345
+    re.compile(r'\b(?:policy|insurance)[\s:]*#?\s*\d[\w\-]{2,20}\b', re.IGNORECASE),
+]
+
+# ---------------------------------------------------------------------------
+# Order Numbers  (ORD-12345, ORDER-789, TXN-ABC123, etc.)
+# ---------------------------------------------------------------------------
+_ORDER_PATTERNS = [
+    # Standard: ORD-12345, TXN-789 (digit right after prefix)
+    re.compile(r'\b(?:ORD|ORDER|TXN|TRANSACTION|AWB|SHIPMENT)[-/#\s]?\d[\w\-]{2,20}\b', re.IGNORECASE),
+    # With text: ORD-WFH-45678 (word then digit somewhere)
+    re.compile(r'\b(?:ORD|ORDER|TXN|TRANSACTION|AWB|SHIPMENT)[-/#](?=[\w\-]*\d)[\w\-]{3,30}\b', re.IGNORECASE),
+    # Lowercase with colon: order: #12345
+    re.compile(r'\b(?:order|transaction)[\s:]*#?\s*\d[\w\-]{2,20}\b', re.IGNORECASE),
+]
+
 
 # ===================================================================
 # Collectors
@@ -99,6 +135,30 @@ def _collect_at_patterns(text: str, urls: Set[str]) -> tuple[Set[str], Set[str]]
     return upis, emails
 
 
+def _collect_case_ids(text: str) -> Set[str]:
+    found: Set[str] = set()
+    for pat in _CASE_ID_PATTERNS:
+        for m in pat.finditer(text):
+            found.add(m.group().strip())
+    return found
+
+
+def _collect_policy_numbers(text: str) -> Set[str]:
+    found: Set[str] = set()
+    for pat in _POLICY_PATTERNS:
+        for m in pat.finditer(text):
+            found.add(m.group().strip())
+    return found
+
+
+def _collect_order_numbers(text: str) -> Set[str]:
+    found: Set[str] = set()
+    for pat in _ORDER_PATTERNS:
+        for m in pat.finditer(text):
+            found.add(m.group().strip())
+    return found
+
+
 # ===================================================================
 # Public API
 # ===================================================================
@@ -109,12 +169,18 @@ def extract_from_text(text: str) -> ExtractedIntelligence:
     banks = _collect_banks(text)
     urls = _collect_urls(text)
     upis, emails = _collect_at_patterns(text, urls)
+    case_ids = _collect_case_ids(text)
+    policy_nums = _collect_policy_numbers(text)
+    order_nums = _collect_order_numbers(text)
     return ExtractedIntelligence(
         phoneNumbers=sorted(phones),
         bankAccounts=sorted(banks),
         upiIds=sorted(upis),
         phishingLinks=sorted(urls),
         emailAddresses=sorted(emails),
+        caseIds=sorted(case_ids),
+        policyNumbers=sorted(policy_nums),
+        orderNumbers=sorted(order_nums),
     )
 
 
@@ -129,5 +195,8 @@ def merge_intelligence(
         upiIds=sorted(set(a.upiIds) | set(b.upiIds)),
         phishingLinks=sorted(set(a.phishingLinks) | set(b.phishingLinks)),
         emailAddresses=sorted(set(a.emailAddresses) | set(b.emailAddresses)),
+        caseIds=sorted(set(a.caseIds) | set(b.caseIds)),
+        policyNumbers=sorted(set(a.policyNumbers) | set(b.policyNumbers)),
+        orderNumbers=sorted(set(a.orderNumbers) | set(b.orderNumbers)),
         suspiciousKeywords=sorted(set(a.suspiciousKeywords) | set(b.suspiciousKeywords)),
     )
