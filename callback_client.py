@@ -17,6 +17,8 @@ BACKOFF_BASE_SECONDS = 1
 async def send_final_result_callback(
     request: HoneypotRequest,
     scam_detected: bool,
+    scam_type: str,
+    confidence_level: float,
     total_messages_exchanged: int,
     engagement_duration_seconds: int,
     intelligence: ExtractedIntelligence,
@@ -28,6 +30,9 @@ async def send_final_result_callback(
         "phishingLinks": intelligence.phishingLinks,
         "phoneNumbers": intelligence.phoneNumbers,
         "emailAddresses": intelligence.emailAddresses,
+        "caseIds": intelligence.caseIds,
+        "policyNumbers": intelligence.policyNumbers,
+        "orderNumbers": intelligence.orderNumbers,
         "suspiciousKeywords": intelligence.suspiciousKeywords,
     }
 
@@ -35,7 +40,10 @@ async def send_final_result_callback(
         "sessionId": request.sessionId,
         "status": "success",
         "scamDetected": scam_detected,
+        "scamType": scam_type or "unknown",
+        "confidenceLevel": confidence_level,
         "totalMessagesExchanged": total_messages_exchanged,
+        "engagementDurationSeconds": engagement_duration_seconds,
         "extractedIntelligence": intelligence_dict,
         "engagementMetrics": {
             "engagementDurationSeconds": engagement_duration_seconds,
@@ -44,8 +52,13 @@ async def send_final_result_callback(
         "agentNotes": agent_notes or "Scam analysis completed",
     }
 
-    logger.info("Sending GUVI callback | sessionId=%s | scamDetected=%s | totalMessages=%d",
-                request.sessionId, scam_detected, total_messages_exchanged)
+    logger.info("Sending GUVI callback | sessionId=%s | scamDetected=%s | totalMessages=%d | "
+                "duration=%d | phones=%d | upis=%d | links=%d | emails=%d | cases=%d | keywords=%d",
+                request.sessionId, scam_detected, total_messages_exchanged,
+                engagement_duration_seconds,
+                len(intelligence.phoneNumbers), len(intelligence.upiIds),
+                len(intelligence.phishingLinks), len(intelligence.emailAddresses),
+                len(intelligence.caseIds), len(intelligence.suspiciousKeywords))
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
