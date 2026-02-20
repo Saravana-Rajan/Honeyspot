@@ -60,6 +60,9 @@ class ExtractedIntelligence(BaseModel):
     phishingLinks: List[str] = []
     phoneNumbers: List[str] = []
     emailAddresses: List[str] = []
+    caseIds: List[str] = []
+    policyNumbers: List[str] = []
+    orderNumbers: List[str] = []
     suspiciousKeywords: List[str] = []
 
 
@@ -67,13 +70,16 @@ class HoneypotResponse(BaseModel):
     # Per-turn fields (platform reads 'reply' for conversation continuation)
     status: Literal["success", "error"]
     reply: str
-    # Scoring fields (included so the platform can score from the response too)
+    # Scoring fields — included in every response for the evaluator
     sessionId: str = ""
     scamDetected: bool = False
     totalMessagesExchanged: int = 0
+    engagementDurationSeconds: int = 0
     extractedIntelligence: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
     engagementMetrics: EngagementMetrics = Field(default_factory=EngagementMetrics)
     agentNotes: str = ""
+    scamType: str = ""
+    confidenceLevel: float = 0.0
 
 
 class GeminiAnalysisResult(BaseModel):
@@ -82,3 +88,5 @@ class GeminiAnalysisResult(BaseModel):
     agentNotes: str
     intelligence: ExtractedIntelligence
     shouldTriggerCallback: bool = False
+    scamType: str = ""
+    confidenceLevel: float = 0.0

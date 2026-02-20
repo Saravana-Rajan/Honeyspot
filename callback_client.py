@@ -10,7 +10,7 @@ from schemas import ExtractedIntelligence, HoneypotRequest
 
 logger = logging.getLogger("honeypot.callback")
 
-MAX_RETRIES = 3
+MAX_RETRIES = 2
 BACKOFF_BASE_SECONDS = 1
 
 
@@ -21,6 +21,8 @@ async def send_final_result_callback(
     engagement_duration_seconds: int,
     intelligence: ExtractedIntelligence,
     agent_notes: str,
+    scam_type: str = "unknown",
+    confidence_level: float = 0.0,
 ) -> None:
     intelligence_dict = {
         "bankAccounts": intelligence.bankAccounts,
@@ -28,20 +30,28 @@ async def send_final_result_callback(
         "phishingLinks": intelligence.phishingLinks,
         "phoneNumbers": intelligence.phoneNumbers,
         "emailAddresses": intelligence.emailAddresses,
+        "caseIds": intelligence.caseIds,
+        "policyNumbers": intelligence.policyNumbers,
+        "orderNumbers": intelligence.orderNumbers,
         "suspiciousKeywords": intelligence.suspiciousKeywords,
     }
 
+    # Payload matches the exact final output schema from the evaluation docs.
+    # Top-level fields for structure scoring + nested engagementMetrics for engagement scoring.
     payload = {
         "sessionId": request.sessionId,
         "status": "success",
         "scamDetected": scam_detected,
         "totalMessagesExchanged": total_messages_exchanged,
+        "engagementDurationSeconds": engagement_duration_seconds,
         "extractedIntelligence": intelligence_dict,
         "engagementMetrics": {
             "engagementDurationSeconds": engagement_duration_seconds,
             "totalMessagesExchanged": total_messages_exchanged,
         },
         "agentNotes": agent_notes or "Scam analysis completed",
+        "scamType": scam_type,
+        "confidenceLevel": confidence_level,
     }
 
     logger.info("Sending GUVI callback | sessionId=%s | scamDetected=%s | totalMessages=%d",

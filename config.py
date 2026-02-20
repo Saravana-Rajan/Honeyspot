@@ -13,5 +13,5 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
-GUVI_CALLBACK_TIMEOUT_SECONDS = 8
+GUVI_CALLBACK_TIMEOUT_SECONDS = 5
 

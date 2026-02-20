@@ -1,12 +1,12 @@
 # Honeyspot - Agentic AI Honeypot for Scam Detection
 
-An AI-powered honeypot system that detects scams, engages fraudsters as a believable human victim, and extracts actionable intelligence (bank accounts, UPI IDs, phone numbers, phishing links, email addresses) across SMS, WhatsApp, Email, and Chat channels. Supports 10+ Indian languages.
+An AI-powered honeypot system that detects scams, engages fraudsters as a believable human victim, and extracts actionable intelligence (bank accounts, UPI IDs, phone numbers, phishing links, email addresses, case IDs, policy numbers, order numbers) across SMS, WhatsApp, Email, and Chat channels. Supports 10+ Indian languages.
 
 Built for the GUVI Hackathon, designed to deploy on Google Cloud Run.
 
-## How It Works
+## Description
 
-Honeyspot receives conversation messages via a REST API and uses Google Gemini to analyze the conversation in real time. The AI agent plays the role of a cautious human victim — keeping scammers engaged while never revealing real information. When enough intelligence has been gathered and a scam is confirmed, Honeyspot triggers a callback to report the extracted data.
+Honeyspot is a scam honeypot API that receives suspected scam messages and responds as a naive human victim. The system uses a dual-extraction strategy: Google Gemini AI for intelligent conversation and analysis, plus regex-based pattern matching as a safety net to ensure no intelligence is missed. Every reply is crafted to keep scammers engaged while probing for identifying information.
 
 ## Tech Stack
 
@@ -20,14 +20,7 @@ Honeyspot receives conversation messages via a REST API and uses Google Gemini t
 | Serialization | orjson |
 | Deployment | Docker + Google Cloud Run |
 
-## Prerequisites
-
-- Python 3.10+ (tested on 3.12 and 3.14)
-- A [Google AI Studio](https://aistudio.google.com/) API key for Gemini
-- (Optional) Docker for containerized deployment
-- (Optional) Google Cloud CLI (`gcloud`) for Cloud Run deployment
-
-## Installation
+## Setup Instructions
 
 ### 1. Clone the repository
 
@@ -50,7 +43,7 @@ source .venv/bin/activate        # macOS / Linux
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 4. Set environment variables
 
 ```bash
 cp .env.example .env
@@ -64,7 +57,7 @@ Edit `.env` and fill in your keys:
 | `GEMINI_API_KEY` | Google Gemini API key | _(required)_ |
 | `GEMINI_MODEL_NAME` | Gemini model to use | `gemini-2.5-flash` |
 
-### 5. Start the server
+### 5. Run the application
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8080
@@ -78,6 +71,93 @@ Verify it's running:
 curl http://localhost:8080/health
 # {"status":"ok"}
 ```
+
+## API Endpoint
+
+- **URL:** `https://your-deployed-url.com/honeypot`
+- **Method:** POST
+- **Authentication:** `x-api-key` header
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-api-key` | Yes | Must match `HONEYPOT_API_KEY` from `.env` |
+| `Content-Type` | Yes | `application/json` |
+
+### Request body
+
+```json
+{
+  "sessionId": "session-001",
+  "message": {
+    "sender": "scammer",
+    "text": "URGENT: Your SBI account will be blocked. Share OTP 4829 to verify. Call 9876543210.",
+    "timestamp": "2026-02-11T10:30:00Z"
+  },
+  "conversationHistory": [],
+  "metadata": {
+    "channel": "SMS",
+    "language": "English",
+    "locale": "IN"
+  }
+}
+```
+
+### Success response (200)
+
+```json
+{
+  "status": "success",
+  "reply": "Wait which account? I have multiple ones with SBI"
+}
+```
+
+## Approach
+
+### How We Detect Scams
+
+Honeyspot uses intent-based classification through Gemini AI, not simple keyword matching. The system analyzes conversation context, sender behavior, and linguistic patterns to distinguish genuine messages from scam attempts.
+
+**Detected scam types:** bank fraud, UPI fraud, phishing, tech support scams, lottery/prize scams, impersonation, insurance fraud, investment fraud, job scams.
+
+**False positive avoidance:** Legitimate messages (family money requests, bill splits, salary notifications, genuine OTP mentions) are correctly identified as non-scams based on conversational context and intent analysis.
+
+### How We Extract Intelligence
+
+A dual-extraction strategy ensures maximum intelligence capture:
+
+1. **Gemini AI extraction** — The LLM analyzes conversation context to identify and extract entities (phone numbers, bank accounts, UPI IDs, URLs, emails, case IDs, policy numbers, order numbers).
+
+2. **Regex-based extraction** — Pattern matching runs on all scammer messages as a safety net, catching entities that the LLM might miss. Supports multiple formats:
+   - Phone numbers: `+91-XXXX`, `91XXXXXXXX`, bare 10-digit, landlines
+   - Bank accounts: 9-20 digit sequences, space/hyphen-separated formats
+   - UPI IDs: `name@provider` format
+   - URLs: `http://`, `https://`, `www.` prefixed
+   - Emails: standard `user@domain.com` format
+   - Case/Reference IDs: prefixed (`CASE-123`, `REF-001`) and natural language (`case no 12345`)
+   - Policy numbers: prefixed (`POL-123`, `LIC-456`) and natural language (`policy no 12345`)
+   - Order numbers: prefixed (`ORD-123`, `TXN-456`) and natural language (`order no 12345`)
+
+3. **Intelligence merging** — Results from both extractors are unioned. Intelligence grows cumulatively across turns and never shrinks.
+
+### How We Maintain Engagement
+
+The system maximizes conversation length through several strategies:
+
+- **Persona:** Acts as a naive, slightly confused, tech-illiterate victim who is cooperative but needs clarification.
+- **Question rotation:** Every reply ends with an investigative question, rotating through identity verification, contact details, organizational info, reference numbers, and process details.
+- **Red flag tracking:** Explicitly identifies and tracks all scam indicators (urgency, credential requests, impersonation, suspicious links, etc.) in structured agent notes.
+- **Language matching:** Responds in the same language as the scammer (Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Punjabi, Kannada, Malayalam, English, and Hinglish).
+- **Never breaks character:** Defends against prompt injection and role reversal attacks.
+
+### Resilience
+
+- Gemini API calls have a 22-second timeout with a 25-second async wrapper
+- Falls back to engaging question-based replies if Gemini is unavailable
+- Validation errors and unhandled exceptions return HTTP 200 with fallback replies (evaluator compatibility)
+- GUVI callback retries up to 2 times with exponential backoff
+- Callbacks are fire-and-forget (non-blocking) and do not affect the API response
 
 ## Docker Deployment
 
@@ -98,171 +178,9 @@ gcloud run deploy honeyspot \
   --set-env-vars "GEMINI_API_KEY=<your-key>,HONEYPOT_API_KEY=<your-key>"
 ```
 
-## API Reference
-
-### Health Check
-
-```
-GET /health
-```
-
-```bash
-curl http://localhost:8080/health
-```
-
-Response: `{"status": "ok"}`
-
-### Analyze Message
-
-```
-POST /honeypot
-```
-
-**Headers:**
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| `x-api-key` | Yes | Must match `HONEYPOT_API_KEY` from `.env` |
-| `Content-Type` | Yes | `application/json` |
-
-**Request body:**
-
-```json
-{
-  "sessionId": "session-001",
-  "message": {
-    "sender": "scammer",
-    "text": "URGENT: Your SBI account will be blocked. Share OTP 4829 to verify. Call 9876543210.",
-    "timestamp": "2026-02-11T10:30:00Z"
-  },
-  "conversationHistory": [],
-  "metadata": {
-    "channel": "SMS",
-    "language": "English",
-    "locale": "IN"
-  }
-}
-```
-
-**Success response (200):**
-
-```json
-{
-  "status": "success",
-  "reply": "Wait which account? I have multiple ones with SBI"
-}
-```
-
-### Usage Examples
-
-**Basic scam detection with curl:**
-
-```bash
-curl -X POST http://localhost:8080/honeypot \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key-here" \
-  -d '{
-    "sessionId": "demo-001",
-    "message": {
-      "sender": "scammer",
-      "text": "Dear customer, your account is blocked. Send Rs 5000 to UPI fraud@ybl to unblock.",
-      "timestamp": "2026-02-11T10:30:00Z"
-    },
-    "conversationHistory": [],
-    "metadata": {"channel": "SMS", "language": "English", "locale": "IN"}
-  }'
-```
-
-**Multi-turn conversation:**
-
-```bash
-curl -X POST http://localhost:8080/honeypot \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key-here" \
-  -d '{
-    "sessionId": "demo-002",
-    "message": {
-      "sender": "scammer",
-      "text": "Please transfer to account 1234567890123456 at HDFC branch",
-      "timestamp": "2026-02-11T10:32:00Z"
-    },
-    "conversationHistory": [
-      {"sender": "scammer", "text": "Sir your KYC is expiring today", "timestamp": "2026-02-11T10:30:00Z"},
-      {"sender": "user", "text": "Oh no, what should I do?", "timestamp": "2026-02-11T10:31:00Z"}
-    ],
-    "metadata": {"channel": "WhatsApp", "language": "English", "locale": "IN"}
-  }'
-```
-
-**Hindi language scam:**
-
-```bash
-curl -X POST http://localhost:8080/honeypot \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key-here" \
-  -d '{
-    "sessionId": "demo-003",
-    "message": {
-      "sender": "scammer",
-      "text": "Aapka account block ho jayega. Abhi OTP bhejiye.",
-      "timestamp": "2026-02-11T10:30:00Z"
-    },
-    "conversationHistory": [],
-    "metadata": {"channel": "SMS", "language": "Hindi", "locale": "IN"}
-  }'
-```
-
-## Error Handling
-
-The API returns structured JSON errors for all failure cases:
-
-| Status Code | Cause | Example Response |
-|-------------|-------|------------------|
-| **401** | Missing or invalid `x-api-key` header | `{"status": "error", "message": "Invalid or missing API key"}` |
-| **422** | Malformed request body (missing fields, invalid types) | `{"status": "error", "message": "Invalid request body", "details": [...]}` |
-| **500** | Internal error (Gemini API failure after retries) | `{"status": "error", "message": "Model error: 504 Deadline Exceeded"}` |
-
-### Retry and resilience
-
-- Gemini API calls retry up to **4 times** with **exponential backoff** (1s, 2s, 4s delays)
-- Each attempt has a **60-second timeout**
-- GUVI callback retries **3 times** with exponential backoff (1s, 2s, 4s)
-- Callbacks are fire-and-forget (non-blocking) and do not affect the API response
-
-### Logging
-
-All logs are written to stdout (suitable for Docker/Cloud Run). Error-level logs (WARNING and above) are also written to `log/error.log` when running locally.
-
-```
-2026-02-16 12:31:24 [INFO] honeypot: Request received | sessionId=demo-001 | message_sender=scammer | history_len=0
-2026-02-16 12:31:28 [INFO] honeypot.gemini: Gemini done | sessionId=demo-001 | scamDetected=True | elapsed_ms=3671 | attempt=1
-```
-
-## Approach
-
-### Scam Detection
-- Intent-based classification (not keyword-based) using Gemini AI with a detailed system prompt
-- Detects: urgency tactics, credential requests, phishing links, impersonation, social engineering
-- Avoids false positives on legitimate messages (family requests, bill splits, salary notifications)
-
-### Intelligence Extraction
-- Extracts bank accounts, UPI IDs, phone numbers, phishing links, email addresses
-- Cumulative extraction across multi-turn conversations (intelligence grows, never shrinks)
-- Reports extracted intelligence to callback endpoint when scam is confirmed
-
-### Multi-Language Support
-- Replies in the same language as the scammer (Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Punjabi, Kannada, Malayalam, and more)
-- Handles mixed-language (Hinglish) conversations
-- Switches language mid-conversation if the scammer does
-
-### Security
-- Prompt injection defense: ignores "ignore your instructions" style attacks
-- Role reversal defense: stays in victim character even when scammers claim to be victims
-- API key authentication on all endpoints
-
 ## Testing
 
-Start the server, then run the full test suite (239 tests):
+Start the server, then run the full test suite:
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8080 &
@@ -275,11 +193,12 @@ Test categories: Health, Auth, Validation, Scam Detection (18 types), Multi-Lang
 
 ```
 Honeyspot/
-├── main.py                 # FastAPI app, endpoints, middleware
-├── gemini_client.py        # Gemini AI integration and analysis
-├── callback_client.py      # GUVI evaluation endpoint callback
-├── schemas.py              # Pydantic request/response models
-├── config.py               # Environment configuration
+├── main.py                 # FastAPI app, endpoints, middleware, exception handlers
+├── gemini_client.py        # Gemini AI integration, system prompt, conversation analysis
+├── intel_extractor.py      # Regex-based intelligence extraction (phone, bank, UPI, URL, email, case ID, policy, order)
+├── callback_client.py      # GUVI evaluation callback with retry logic
+├── schemas.py              # Pydantic request/response models (HoneypotRequest, HoneypotResponse, ExtractedIntelligence)
+├── config.py               # Environment configuration (API keys, model name, callback URL)
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile              # Cloud Run container
 ├── .dockerignore           # Files excluded from Docker build
@@ -295,6 +214,7 @@ Honeyspot/
     ├── test_adversarial.py      # Evasion resistance
     ├── test_multiturn.py        # Multi-turn conversation tests
     ├── test_intel_extraction.py # Intelligence extraction accuracy
+    ├── test_scoring.py          # Scoring verification
     └── test_edge_cases.py       # Language, injection, role reversal
 ```
 
